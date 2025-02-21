@@ -195,11 +195,12 @@ async function asignar(didenvio, empresa, cadete, quien) {
     }
 }
 
-async function desasignar(didenvio, empresa, cadete, quien, res) {
-    const Aempresas = await iniciarProceso();
-    const AdataDB = Aempresas[empresa];
 
-    return new Promise((resolve, reject) => {
+async function desasignar(didenvio, empresa, cadete, quien, response) {
+    try {
+        const Aempresas = await iniciarProceso();
+        const AdataDB = Aempresas[empresa];
+
         const con = mysql.createConnection({
             host: "bhsmysql1.lightdata.com.ar",
             user: AdataDB.dbuser,
@@ -207,197 +208,71 @@ async function desasignar(didenvio, empresa, cadete, quien, res) {
             database: AdataDB.dbname
         });
 
-        con.connect(function(err) {
-            if (err) {
-                const response = { estado: false, mensaje: "Error de conexión a la base de datos." };
-                res.writeHead(500);
-                return reject(response); // Rechaza la promesa
-            }
-
-            let sql = `UPDATE envios_asignaciones SET superado=1 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
-            con.query(sql, (err) => {
+        const sqlOperador = "SELECT operador FROM envios_asignaciones WHERE didEnvio = ? AND superado = 0 AND elim = 0";
+        
+        // Usamos una promesa para manejar la consulta
+        const operadorResult = await new Promise((resolve, reject) => {
+            con.query(sqlOperador, [didenvio], (err, result) => {
                 if (err) {
-                    const response = { estado: false, mensaje: "Error al desasignar." };
-                    con.end();
-                    return reject(response); // Rechaza la promesa
+                    console.error("Error en la consulta: ", err);
+                    return reject({ estadoRespuesta: false, mensaje: "Error en la consulta" });
                 }
-
-                let historialSql = `UPDATE envios_historial SET didCadete=0 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
-                con.query(historialSql, (err) => {
-                    if (err) {
-                        const response = { estado: false, mensaje: "Error al actualizar historial." };
-                        con.end();
-                        return reject(response); // Rechaza la promesa
-                    }
-
-                    let choferSql = `UPDATE envios SET choferAsignado = 0 WHERE superado=0 AND elim=0 AND did = ${mysql.escape(didenvio)}`;
-                    con.query(choferSql, (err) => {
-                        if (err) {
-                            const response = { estado: false, mensaje: "Error al desasignar chofer." };
-                            con.end();
-                            return reject(response); // Rechaza la promesa
-                        }
-
-                        con.end();
-                        const respueta= resolve({ feature: "asignacion", estadoRespuesta: true, mensaje: "Desasignado correctamente." });
-                        console.log(respueta,"llegue");
-                        
-                        return respueta 
-                        
-                    });
-                });
+                resolve(result);
             });
         });
-    });
-}
 
-
-const server = http.createServer((req, res) => {
-    if (req.method === 'POST') {
-        let body = '';
-
-        req.on('data', chunk => {
-            body += chunk;
-        });
-
-        req.on('end', async () => {
-            const dataEntrada = qs.decode(body);
-            const operador = dataEntrada.operador;
-
-            if (operador === "actualizarEmpresas") {
-                // Aquí puedes llamar a la función para actualizar empresas
-            } else if (operador === "getEmpresas") {
-                const buffer = JSON.stringify("pruebas2 =>" + JSON.stringify(Aempresas));
-                res.writeHead(200);
-                res.end(buffer);
-            } else {
-                await handleOperador(dataEntrada, res);
-            }
-        });
-    } else {
-        res.writeHead(404);
-        res.end();
-    }
-});
-
-async function handleOperador(dataEntrada, res) {
-    const { empresa, cadete, quien, dataQR } = dataEntrada;
-
-    if (empresa == 12 && quien == 49) {
-        const response = { estado: false, mensaje: "Comunicarse con la logística." };
-        return sendResponse(res, response);
-    }
-
-    const fechaunix = Date.now();
-    const sqlLog = `INSERT INTO logs (didempresa, quien, cadete, data, fechaunix) VALUES (${mysql.escape(empresa)}, ${mysql.escape(quien)}, ${mysql.escape(cadete)}, ${mysql.escape(dataQR)}, ${mysql.escape(fechaunix)})`;
-
-    conLocal.query(sqlLog, (err, result) => {
-        if (err) {
-            console.error("Error al insertar en logs:", err);
-        }
-    });
-
-    const dataQRParsed = JSON.parse(dataQR);
-    if (Aempresas[empresa]) {
-        const AdataDB = Aempresas[empresa];
-
-        if (AdataDB.dbname && AdataDB.dbuser && AdataDB.dbpass) {
-            const con = mysql.createConnection({
-                host: "bhsmysql1.lightdata.com.ar",
-                user: AdataDB.dbuser,
-                password: AdataDB.dbpass,
-                database: AdataDB.dbname
-            });
-
-            con.connect(err => {
-                if (err) {
-                    const response = { estado: false, mensaje: err.message };
-                    return sendResponse(res, response);
-                }
-            });
-
-            const isFlex = dataQRParsed.hasOwnProperty("sender_id");
-            let didenvio = isFlex ? 0 : dataQRParsed.did;
-
-            if (!isFlex) {
-                handleRegularPackage(didenvio, empresa, cadete, quien, con, res);
-            } else {
-                handleFlexPackage(dataQRParsed.id, con, cadete, empresa, res);
-            }
-        } else {
-            const response = { estado: false, mensaje: "Error al conectar a la DB" };
-            sendResponse(res, response);
-        }
-    } else {
-        const response = { estado: false, mensaje: "No está cargado el ID de la empresa" };
-        sendResponse(res, response);
-    }
-}
-
-function handleRegularPackage(didenvio, empresa, cadete, quien, con, res) {
-    const didempresapaquete = dataQRParsed.empresa;
-
-    if (empresa !== didempresapaquete) {
-        const sql = `SELECT didLocal FROM envios_exteriores WHERE superado=0 AND elim=0 AND didExterno = ${mysql.escape(didenvio)} AND didEmpresa = ${mysql.escape(didempresapaquete)}`;
-        con.query(sql, (err, rows) => {
-            if (err) {
-                console.error("Error en consulta de envios_exteriores:", err);
-            }
-
-            const Aresult = Object.values(JSON.parse(JSON.stringify(rows)));
+        const operador = operadorResult.length > 0 ? operadorResult[0].operador : -1;
+        if (operador === -1 || operador === 0) {
             con.end();
-
-            if (Aresult.length > 0) {
-                const didLocal = Aresult[0]["didLocal"];
-                if (cadete !== -2) {
-                    asignar(didLocal, empresa, cadete, quien, res);
-                } else {
-                    desasignar(didLocal, empresa, cadete, quien, res);
-                }
-            } else {
-                const response = { estado: false, mensaje: "El paquete externo no existe en la logística." };
-                sendResponse(res, response);
-            }
-        });
-    } else {
-        if (cadete !== -2) {
-            asignar(didenvio, empresa, cadete, quien, res);
-        } else {
-            desasignar(didenvio, empresa, cadete, quien, res);
+            const responseMessage = { estadoRespuesta: false, mensaje: "El paquete ya está desasignado",feature: "asignacion"};
+            return (responseMessage); // Envía el mensaje a través de RabbitMQ
         }
+
+        // Promesa para realizar la actualización
+        await new Promise((resolve, reject) => {
+            let sql = `UPDATE envios_asignaciones SET superado=1 WHERE superado=0 AND elim=0 AND didEnvio = ?`;
+            con.query(sql, [didenvio], (err) => {
+                if (err) {
+                    return reject({ estado: false, mensaje: "Error al desasignar." });
+                }
+                resolve();
+            });
+        });
+
+        await new Promise((resolve, reject) => {
+            let historialSql = `UPDATE envios_historial SET didCadete=0 WHERE superado=0 AND elim=0 AND didEnvio = ?`;
+            con.query(historialSql, [didenvio], (err) => {
+                if (err) {
+                    return reject({ estado: false, mensaje: "Error al actualizar historial." });
+                }
+                resolve();
+            });
+        });
+
+        await new Promise((resolve, reject) => {
+            let choferSql = `UPDATE envios SET choferAsignado = 0 WHERE superado=0 AND elim=0 AND did = ?`;
+            con.query(choferSql, [didenvio], (err) => {
+                if (err) {
+                    return reject({ estado: false, mensaje: "Error al desasignar." });
+                }
+                resolve();
+            });
+        });
+
+        con.end();
+        console.log("Desasignado correctamente.");
+        const successResponse = { feature: "asignacion", estadoRespuesta: true, mensaje: "Desasignado correctamente." };
+        return (successResponse); // Envía el mensaje a través de RabbitMQ
+
+    } catch (error) {
+        console.error(error);
+        const errorResponse = { estadoRespuesta: false, mensaje: error.mensaje || "Error en el proceso" };
+        return (errorResponse); // Envía el mensaje de error a través de RabbitMQ
     }
 }
 
-function handleFlexPackage(idshipment, con, cadete, empresa, res) {
-    const query = `SELECT did FROM envios WHERE flex=1 AND superado=0 AND elim=0 AND ml_shipment_id = ${mysql.escape(idshipment)}`;
-    con.query(query, (err, rows) => {
-        if (err) {
-            const response = { estado: false, mensaje: query };
-            sendResponse(res, response);
-            return;
-        }
 
-        const Aresult = Object.values(JSON.parse(JSON.stringify(rows)));
-        con.end();
 
-        if (Aresult.length > 0) {
-            const didenvio = Aresult[0]["did"];
-            if (cadete !== -2) {
-                asignar(didenvio, empresa, cadete, quien, res);
-            } else {
-                desasignar(didenvio, empresa, cadete, quien, res);
-            }
-        } else {
-            // Aquí puedes manejar lo que sucede si no se encuentra el paquete
-        }
-    });
-}
-
-function sendResponse(res, response) {
-    const buffer = JSON.stringify(response);
-    res.writeHead(200);
-    res.end(buffer);
-}
 
 async function iniciarProceso() {
     try {
@@ -431,4 +306,3 @@ function query(con, sql, params) {
 }
 
 module.exports = { asignar,desasignar ,Aempresas,iniciarProceso,actualizarEmpresas};
-
