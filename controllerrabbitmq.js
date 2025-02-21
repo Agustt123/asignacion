@@ -183,10 +183,7 @@ async function asignar(didenvio, empresa, cadete, quien) {
 
         // Actualizar costos chofer
         await query(con, `UPDATE envios SET costoActualizadoChofer = 0 WHERE superado=0 AND elim=0 AND did = ?`, [didenvio]);
-        const ahora = new Date();
-        const horaEnvio = ahora.toLocaleTimeString();
-        console.log(horario,"tiempo ext");
-        
+      
         // Guardar datos en la tabla asignaciones_{didempresa}
         const resultadoGuardar = await guardarDatosEnTabla(empresa, did, cadete, estado, quien, 0, conLocal);
         return resultadoGuardar; // Devolver el resultado de guardarDatosEnTabla
@@ -428,4 +425,3 @@ function query(con, sql, params) {
 }
 
 module.exports = { asignar,desasignar ,Aempresas,iniciarProceso,actualizarEmpresas};
-
