@@ -198,55 +198,59 @@ async function asignar(didenvio, empresa, cadete, quien) {
 async function desasignar(didenvio, empresa, cadete, quien, res) {
     const Aempresas = await iniciarProceso();
     const AdataDB = Aempresas[empresa];
-    
-    let response = "";
 
-    const con = mysql.createConnection({
-        host: "bhsmysql1.lightdata.com.ar",
-        user: AdataDB.dbuser,
-        password: AdataDB.dbpass,
-        database: AdataDB.dbname
-    });
+    return new Promise((resolve, reject) => {
+        const con = mysql.createConnection({
+            host: "bhsmysql1.lightdata.com.ar",
+            user: AdataDB.dbuser,
+            password: AdataDB.dbpass,
+            database: AdataDB.dbname
+        });
 
-    con.connect(function(err) {
-        if (err) {
-            response = { estado: false, mensaje: "Error de conexión a la base de datos." };
-            res.writeHead(500);
-          
-        }
-    });
-
-    let sql = `UPDATE envios_asignaciones SET superado=1 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
-    con.query(sql, (err) => {
-        if (err) {
-            response = { estado: false, mensaje: "Error al desasignar." };
-            con.end();
-       
-        }
-
-        let historialSql = `UPDATE envios_historial SET didCadete=0 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
-        con.query(historialSql, (err) => {
+        con.connect(function(err) {
             if (err) {
-                response = { estado: false, mensaje: "Error al actualizar historial." };
-                con.end();
-               
+                const response = { estado: false, mensaje: "Error de conexión a la base de datos." };
+                res.writeHead(500);
+                return reject(response); // Rechaza la promesa
             }
 
-            let choferSql = `UPDATE envios SET choferAsignado = 0 WHERE superado=0 AND elim=0 AND did = ${mysql.escape(didenvio)}`;
-            con.query(choferSql, (err) => {
+            let sql = `UPDATE envios_asignaciones SET superado=1 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
+            con.query(sql, (err) => {
                 if (err) {
-                    response = { estado: false, mensaje: "Error al desasignar chofer." };
+                    const response = { estado: false, mensaje: "Error al desasignar." };
                     con.end();
-                    return res.writeHead(500).end(JSON.stringify(response));
+                    return reject(response); // Rechaza la promesa
                 }
 
-                response = { estado: true, mensaje: "Paquete desasignado correctamente." };
-                con.end();
-                
+                let historialSql = `UPDATE envios_historial SET didCadete=0 WHERE superado=0 AND elim=0 AND didEnvio = ${mysql.escape(didenvio)}`;
+                con.query(historialSql, (err) => {
+                    if (err) {
+                        const response = { estado: false, mensaje: "Error al actualizar historial." };
+                        con.end();
+                        return reject(response); // Rechaza la promesa
+                    }
+
+                    let choferSql = `UPDATE envios SET choferAsignado = 0 WHERE superado=0 AND elim=0 AND did = ${mysql.escape(didenvio)}`;
+                    con.query(choferSql, (err) => {
+                        if (err) {
+                            const response = { estado: false, mensaje: "Error al desasignar chofer." };
+                            con.end();
+                            return reject(response); // Rechaza la promesa
+                        }
+
+                        con.end();
+                        const respueta= resolve({ feature: "asignacion", estadoRespuesta: true, mensaje: "Desasignado correctamente." });
+                        console.log(respueta,"llegue");
+                        
+                        return respueta 
+                        
+                    });
+                });
             });
         });
     });
 }
+
 
 const server = http.createServer((req, res) => {
     if (req.method === 'POST') {
