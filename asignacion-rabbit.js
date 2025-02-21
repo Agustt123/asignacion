@@ -41,7 +41,7 @@ async function connectRabbitMQ() {
                     const startSendTime = performance.now(); // Tiempo de inicio de envío
                     await channel.sendToQueue(
                         dataEntrada.canal, // Nombre del canal de respuesta
-                        Buffer.from(JSON.stringify("resultado")), // Respuesta
+                        Buffer.from(JSON.stringify(resultado)), // Respuesta
                         { persistent: true }
                     );
                     const endSendTime = performance.now(); // Tiempo de finalización de envío
@@ -160,7 +160,7 @@ async function handleRegularPackage(didenvio, empresa, cadete, quien, con, dataQ
     } else {
   
         
-           // return cadete !== -2 ? asignar(didenvio, empresa, cadete, quien) : desasignar(didenvio, empresa, cadete, quien);
+            return cadete !== -2 ? asignar(didenvio, empresa, cadete, quien) : desasignar(didenvio, empresa, cadete, quien);
         
     }
 }
@@ -198,6 +198,7 @@ function query(connection, sql, params) {
 
 // Iniciar la conexión a RabbitMQ
 connectRabbitMQ();
+
 
 
 
