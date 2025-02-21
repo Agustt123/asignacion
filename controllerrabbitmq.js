@@ -141,11 +141,8 @@ async function asignar(didenvio, empresa, cadete, quien) {
         if (rows.length > 0 && empresa != 4) {
             const did2 = rows[0]["id"];
             const estado2 = rows[0]["estado"];
-
-                  const ahora = new Date();
-                                                             const horaEnvio = ahora.toLocaleTimeString();
-                                                             console.log(horaEnvio,"antes de guardar");
-        //    const resultadoGuardar = await guardarDatosEnTabla(empresa, did2, cadete, estado2, quien, 0, conLocal);
+            
+            const resultadoGuardar = await guardarDatosEnTabla(empresa, did2, cadete, estado2, quien, 0, conLocal);
             return resultadoGuardar; 
         }
 
@@ -160,8 +157,8 @@ async function asignar(didenvio, empresa, cadete, quien) {
         const estado = estadoRows[0]["estado"];
 
         // Crear la tabla asignaciones_{didempresa} si no existe
-       // await crearTablaAsignaciones(empresa, conLocal);
-        //await crearUsuario(empresa, conLocal);
+        await crearTablaAsignaciones(empresa, conLocal);
+        await crearUsuario(empresa, conLocal);
 
         // Insertar en envios_asignaciones
         const insertSql = `INSERT INTO envios_asignaciones (did, operador, didEnvio, estado, quien, desde) VALUES ("", ?, ?, ?, ?, 'Movil')`;
@@ -431,3 +428,4 @@ function query(con, sql, params) {
 }
 
 module.exports = { asignar,desasignar ,Aempresas,iniciarProceso,actualizarEmpresas};
+
