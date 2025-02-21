@@ -196,7 +196,9 @@ async function asignar(didenvio, empresa, cadete, quien) {
 }
 
 async function desasignar(didenvio, empresa, cadete, quien, res) {
+    const Aempresas = await iniciarProceso();
     const AdataDB = Aempresas[empresa];
+    
     let response = "";
 
     const con = mysql.createConnection({
@@ -425,3 +427,4 @@ function query(con, sql, params) {
 }
 
 module.exports = { asignar,desasignar ,Aempresas,iniciarProceso,actualizarEmpresas};
+
